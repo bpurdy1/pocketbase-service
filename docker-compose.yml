@@ -1,10 +1,10 @@
 include:
-  - libSQL/docker-compose.yml
+  - docker/libSQL/docker-compose.yml
 services:
   pb:
     build:
       context: .
-      dockerfile: auth/Dockerfile
+      dockerfile: Dockerfile
     container_name: pb
     restart: unless-stopped
     env_file:
@@ -31,8 +31,7 @@ services:
     networks:
       - app-network
     depends_on:
-      - app
-      - auth
+      - pb
 
 volumes:
   app-data:

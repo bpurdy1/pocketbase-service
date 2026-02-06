@@ -1,3 +1,6 @@
+WIP JUST MAKING IT RUN FOR NOW
+
+
 # PocketBase Server
 
 A custom Go server wrapping PocketBase with extensible service architecture.
