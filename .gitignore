@@ -11,6 +11,7 @@ libSQL/data/
 pb_data/
 
 # Environment files
+.env
 .env.local
 .env.*.local
 

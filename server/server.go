@@ -1,11 +1,9 @@
 package server
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,8 +11,8 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/tursodatabase/go-libsql"
 
+	"pocketbase-server/internal/database"
 	"pocketbase-server/server/admin"
 	"pocketbase-server/server/router"
 	"pocketbase-server/service"
@@ -46,51 +44,26 @@ func NewConfig() *Config {
 }
 
 type Server struct {
-	app       *pocketbase.PocketBase
-	cfg       *Config
-	connector *libsql.Connector
+	app  *pocketbase.PocketBase
+	cfg  *Config
+	conn *database.LibSQLConnection
 }
 
 type Option func(*pocketbase.Config)
 
-func newLibsqlConnection(cfg *Config) (*libsql.Connector, error) {
-	if cfg.LibSQLInterval == 0 {
-		cfg.LibSQLInterval = time.Minute * 5
-	}
-
-	// Ensure data directory exists
-	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create data directory: %w", err)
-	}
-
-	localDBPath := filepath.Join(cfg.DataDir, "data.db")
-
-	// Build connector options
-	opts := []libsql.Option{
-		libsql.WithSyncInterval(cfg.LibSQLInterval),
-	}
-
-	// Only add auth token if provided (not needed for local libSQL)
-	if cfg.LibSQLToken != "" {
-		opts = append(opts, libsql.WithAuthToken(cfg.LibSQLToken))
-	}
-
-	if cfg.LibSQLURL != "" {
-		fmt.Println(localDBPath, cfg.LibSQLURL)
-		fmt.Println(opts)
-		return libsql.NewEmbeddedReplicaConnector(localDBPath, cfg.LibSQLURL, opts...)
-	}
-	return libsql.NewEmbeddedReplicaConnector(localDBPath, cfg.LibSQLURL, opts...)
-}
-
 func New() (*Server, error) {
 	cfg := NewConfig()
-
-	connector, err := newLibsqlConnection(cfg)
+	conn, err := database.NewLibSQLConnection(
+		&database.LibSQLConfig{
+			DataDir:  cfg.DataDir,
+			URL:      cfg.LibSQLURL,
+			Token:    cfg.LibSQLToken,
+			Interval: cfg.LibSQLInterval,
+		},
+	)
 	if err != nil {
 		panic(err)
 	}
-	sqlDB := sql.OpenDB(connector)
 
 	var pbcfg = pocketbase.Config{
 		DefaultDataDir: cfg.DataDir,
@@ -98,7 +71,7 @@ func New() (*Server, error) {
 		DBConnect: func(dbPath string) (*dbx.DB, error) {
 			// Use libSQL connector for the main data.db
 			if strings.HasSuffix(dbPath, "data.db") {
-				return dbx.NewFromDB(sqlDB, "sqlite"), nil
+				return dbx.NewFromDB(conn.DB, "sqlite"), nil
 			}
 			// Use default SQLite for auxiliary databases (logs, etc.)
 			return core.DefaultDBConnect(dbPath)
@@ -108,9 +81,9 @@ func New() (*Server, error) {
 	app := pocketbase.NewWithConfig(pbcfg)
 
 	s := &Server{
-		app:       app,
-		cfg:       cfg,
-		connector: connector,
+		app:  app,
+		cfg:  cfg,
+		conn: conn,
 	}
 
 	router := router.NewRouter(s.App())
@@ -169,15 +142,8 @@ func (s *Server) AddHTTPHandler(method, path string, handler http.HandlerFunc) {
 }
 
 func (s *Server) Sync() error {
-	if s.connector != nil {
-		_, err := s.connector.Sync()
-		return err
-	}
-	return nil
+	return s.conn.Sync()
 }
 func (s *Server) Close() error {
-	if s.connector != nil {
-		return s.connector.Close()
-	}
-	return nil
+	return s.conn.Close()
 }
