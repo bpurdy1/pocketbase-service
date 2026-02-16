@@ -2,8 +2,6 @@ package service
 
 import (
 	"github.com/pocketbase/pocketbase"
-
-	"pocketbase-server/internal/collections"
 )
 
 type Service struct {
@@ -11,7 +9,6 @@ type Service struct {
 }
 
 func NewService(app *pocketbase.PocketBase) *Service {
-	collections.NewCollectionManager(app)
 	return &Service{
 		app: app,
 	}

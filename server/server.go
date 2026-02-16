@@ -12,6 +12,9 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 
+	"pocketbase-server/internal/collections"
+	authproviders "pocketbase-server/internal/collections/auth-providers"
+	"pocketbase-server/internal/collections/realestate"
 	"pocketbase-server/internal/database"
 	"pocketbase-server/server/admin"
 	"pocketbase-server/server/router"
@@ -91,6 +94,17 @@ func New() (*Server, error) {
 	admin.BindSyncFunc(s.App(), s)
 	admin.RedirectAdminUI(s.App())
 	admin.EnsureAdmin(s.App(), cfg.AdminEmail, cfg.AdminPass)
+
+	// Phase 1: Create collections (no cross-collection rules)
+	collections.EnsureUserFields(s.App())
+	collections.EnsureOrganizations(s.App())
+	collections.EnsureOrgMembers(s.App())
+	collections.EnsureSettings(s.App())
+	realestate.EnsureProperties(s.App())
+	// Phase 2: Apply access rules (all collections now exist)
+	collections.ApplyOrgRules(s.App())
+	realestate.ApplyPropertyRules(s.App())
+	authproviders.EnsureOAuth2Providers(s.App())
 
 	service.NewService(s.App())
 	return s, nil
