@@ -5,10 +5,16 @@ import (
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
+
+	"pocketbase-server/internal/collections/tenancy"
 )
 
+func init() {
+	tenancy.Register("properties", "organization")
+}
+
 // EnsureProperties creates the properties collection if it doesn't exist.
-// Rules are applied separately by ApplyPropertyRules after all collections exist.
+// Access rules are applied automatically by tenancy.EnforceTenancy.
 func EnsureProperties(app *pocketbase.PocketBase) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		existing, _ := app.FindCollectionByNameOrId("properties")
@@ -49,33 +55,6 @@ func EnsureProperties(app *pocketbase.PocketBase) {
 			log.Printf("Failed to create properties collection: %v", err)
 		} else {
 			log.Println("Created properties collection")
-		}
-
-		return e.Next()
-	})
-}
-
-// ApplyPropertyRules sets access rules on properties. Must run after org_members exists.
-func ApplyPropertyRules(app *pocketbase.PocketBase) {
-	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		collection, err := app.FindCollectionByNameOrId("properties")
-		if err != nil || collection.ListRule != nil {
-			return e.Next()
-		}
-
-		memberRule := "@request.auth.id != '' && organization.id ?= @collection.org_members.organization && @request.auth.id ?= @collection.org_members.user"
-		collection.ListRule = &memberRule
-		collection.ViewRule = &memberRule
-
-		adminRule := "@request.auth.id != '' && organization.id ?= @collection.org_members.organization && @request.auth.id ?= @collection.org_members.user && (@collection.org_members.role = 'owner' || @collection.org_members.role = 'admin')"
-		collection.CreateRule = &adminRule
-		collection.UpdateRule = &adminRule
-		collection.DeleteRule = &adminRule
-
-		if err := app.Save(collection); err != nil {
-			log.Printf("Failed to apply properties rules: %v", err)
-		} else {
-			log.Println("Applied properties access rules")
 		}
 
 		return e.Next()

@@ -6,16 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/joho/godotenv"
-
 	"pocketbase-server/server"
 )
-
-func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using environment variables")
-	}
-}
 
 func main() {
 	srv, err := server.New()

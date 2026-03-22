@@ -1,4 +1,4 @@
-package collections
+package organizations
 
 import (
 	"log"
@@ -7,9 +7,9 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// ApplyOrgRules sets access rules on organizations and org_members.
-// Must run after both collections have been created.
-func ApplyOrgRules(app *pocketbase.PocketBase) {
+// ApplyRules sets access rules on organizations and org_members.
+// Must run after both collections have been created (Phase 2).
+func ApplyRules(app *pocketbase.PocketBase) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		applyOrganizationsRules(app)
 		applyOrgMembersRules(app)

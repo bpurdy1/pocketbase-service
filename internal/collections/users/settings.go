@@ -1,4 +1,4 @@
-package collections
+package users
 
 import (
 	"log"
@@ -7,7 +7,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// EnsureSettings creates the user_settings collection if it doesn't exist.
+// EnsureSettings creates the settings collection if it doesn't exist.
 func EnsureSettings(app *pocketbase.PocketBase) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		existing, _ := app.FindCollectionByNameOrId("settings")
@@ -41,7 +41,6 @@ func EnsureSettings(app *pocketbase.PocketBase) {
 			&core.JSONField{Name: "preferences"},
 		)
 
-		// Only the owner can read/update their own settings
 		ownerRule := "@request.auth.id = user || @request.auth.role = \"admin\""
 		collection.ListRule = &ownerRule
 		collection.ViewRule = &ownerRule
@@ -49,13 +48,12 @@ func EnsureSettings(app *pocketbase.PocketBase) {
 		collection.CreateRule = &ownerRule
 		collection.DeleteRule = &ownerRule
 
-		// One settings record per user
 		collection.AddIndex("idx_user_settings_user", true, "user", "")
 
 		if err := app.Save(collection); err != nil {
-			log.Printf("Failed to create user_settings collection: %v", err)
+			log.Printf("Failed to create settings collection: %v", err)
 		} else {
-			log.Println("Created user_settings collection")
+			log.Println("Created settings collection")
 		}
 
 		return e.Next()

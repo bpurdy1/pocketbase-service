@@ -1,4 +1,4 @@
-package authproviders
+package auth
 
 import (
 	"log"
@@ -8,15 +8,15 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-type AuthProvidersConfig struct {
+type OAuth2Config struct {
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
 	GithubClientID     string `env:"GITHUB_CLIENT_ID"`
 	GithubClientSecret string `env:"GITHUB_CLIENT_SECRET"`
 }
 
-func NewAuthProvidersConfig() AuthProvidersConfig {
-	var cfg AuthProvidersConfig
+func NewOAuth2Config() OAuth2Config {
+	var cfg OAuth2Config
 	if err := env.Parse(&cfg); err != nil {
 		panic(err)
 	}
@@ -25,7 +25,7 @@ func NewAuthProvidersConfig() AuthProvidersConfig {
 
 // EnsureOAuth2Providers configures OAuth2 providers on the users auth collection.
 func EnsureOAuth2Providers(app *pocketbase.PocketBase) {
-	cfg := NewAuthProvidersConfig()
+	cfg := NewOAuth2Config()
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		users, err := app.FindCollectionByNameOrId("users")

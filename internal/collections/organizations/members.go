@@ -1,15 +1,16 @@
-package collections
+package organizations
 
 import (
 	"log"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
+
+	"pocketbase-server/internal/collections/roles"
 )
 
-// EnsureOrgMembers creates the org_members join table if it doesn't exist.
-// Rules are applied separately by ApplyOrgRules after all collections exist.
-func EnsureOrgMembers(app *pocketbase.PocketBase) {
+// EnsureMembers creates the org_members join table if it doesn't exist.
+func EnsureMembers(app *pocketbase.PocketBase) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		existing, _ := app.FindCollectionByNameOrId("org_members")
 		if existing != nil {
@@ -47,11 +48,10 @@ func EnsureOrgMembers(app *pocketbase.PocketBase) {
 				Name:      "role",
 				Required:  true,
 				MaxSelect: 1,
-				Values:    AllOrgRoles,
+				Values:    roles.AllOrg,
 			},
 		)
 
-		// One membership per user per org
 		collection.AddIndex("idx_org_members_unique", true, "user, organization", "")
 		collection.AddIndex("idx_org_members_org", false, "organization", "")
 

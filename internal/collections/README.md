@@ -127,7 +127,6 @@ PocketBase built-in. Superusers bypass all collection access rules and have full
 internal/collections/
   roles.go                          Role constants and enums
   ensure.go                         Users collection (phone, role fields)
-  orginization.go                   Organizations collection + owner hook
   org_members.go                    Join table (user + org + role)
   settings.go                       Per-user settings
   realestate/

@@ -9,36 +9,14 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - LIBSQL_URL=http://libsql-primary:8080
     ports:
       - "8090:8090"
     volumes:
       - pb-data:/app/db/pb_data
-    networks:
-      - app-network
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: caddy
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy-data:/data
-      - caddy-config:/config
-    networks:
-      - app-network
     depends_on:
-      - pb
+      - libsql-primary
 
 volumes:
-  app-data:
   pb-data:
-  caddy-data:
-  caddy-config:
-
-networks:
-  app-network:
-    driver: bridge
