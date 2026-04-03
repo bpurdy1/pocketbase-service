@@ -2,6 +2,7 @@ package router
 
 import (
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 type Router struct {
@@ -15,5 +16,9 @@ func NewRouter(app *pocketbase.PocketBase) *Router {
 }
 
 func (r *Router) RegisterBind() {
-
+	r.app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		r.bindInviteRoutes(e)
+		r.bindAdminRoutes(e)
+		return e.Next()
+	})
 }

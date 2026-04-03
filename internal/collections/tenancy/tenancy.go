@@ -13,6 +13,9 @@ type OrgScoped struct {
 	Collection string
 	// OrgField is the name of the relation field pointing to organizations (e.g. "organization")
 	OrgField string
+	// PublicRead allows anyone to list/view records without authentication.
+	// Write operations (create/update/delete) still require org membership.
+	PublicRead bool
 }
 
 // registered holds all org-scoped collections
@@ -22,6 +25,11 @@ var registered []OrgScoped
 // Call this from your Ensure* functions before EnforceTenancy runs.
 func Register(collection, orgField string) {
 	registered = append(registered, OrgScoped{Collection: collection, OrgField: orgField})
+}
+
+// RegisterPublicRead adds a collection with public list/view but org-gated writes.
+func RegisterPublicRead(collection, orgField string) {
+	registered = append(registered, OrgScoped{Collection: collection, OrgField: orgField, PublicRead: true})
 }
 
 // EnforceTenancy auto-applies org-scoped access rules to all registered collections.
@@ -64,11 +72,21 @@ func applyOrgScopedRules(app *pocketbase.PocketBase, scope OrgScoped) {
 		"(@collection.org_members.role = 'owner' || @collection.org_members.role = 'admin')"
 
 	// Platform admins bypass all rules
-	memberRuleWithAdmin := "(@request.auth.role = 'admin') || (" + memberRule + ")"
 	adminRuleWithAdmin := "(@request.auth.role = 'admin') || (" + adminRule + ")"
 
-	collection.ListRule = &memberRuleWithAdmin
-	collection.ViewRule = &memberRuleWithAdmin
+	var listRule, viewRule string
+	if scope.PublicRead {
+		// Anyone can read, no auth required
+		listRule = ""
+		viewRule = ""
+		collection.ListRule = &listRule
+		collection.ViewRule = &viewRule
+	} else {
+		memberRuleWithAdmin := "(@request.auth.role = 'admin') || (" + memberRule + ")"
+		collection.ListRule = &memberRuleWithAdmin
+		collection.ViewRule = &memberRuleWithAdmin
+	}
+
 	collection.CreateRule = &adminRuleWithAdmin
 	collection.UpdateRule = &adminRuleWithAdmin
 	collection.DeleteRule = &adminRuleWithAdmin

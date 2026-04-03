@@ -6,15 +6,17 @@ LOCAL_LOAD_DATA_DB_FILE         = ./db/turso/data.db
 .PHONY: run build docker-dev libsql-dev libsql-down libsql-logs clean
 
 run:
-	go run cmd/server/main.go
+	go run -tags dev cmd/server/*
+
+clean:
+	rm -rf bin/
+	rm -rf db/pb_data
 
 build:
 	go build -o bin/server cmd/server/main.go
 
 docker-dev:
 	docker-compose -f docker-compose.yml up -d
-
-
 
 libsql-up:
 	docker-compose -f $(LIBSQL_DOCKER_COMPOSE) up -d
@@ -32,14 +34,7 @@ load-data:
 	else \
 		echo "No local data.db found — skipping load"; \
 	fi
-
 down:
 	docker-compose down
 up:
 	docker-compose up -d
-
-
-
-clean:
-	rm -rf bin/
-	rm -rf db/

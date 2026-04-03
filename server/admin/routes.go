@@ -60,7 +60,8 @@ func BindSyncFunc(app *pocketbase.PocketBase, s Sync) {
 	})
 }
 
-// EnsureAdmin creates an admin if one doesn't exist.
+// EnsureAdmin upserts a superuser with the given email and password.
+// If a superuser with that email already exists, its password is updated.
 // Uses OnServe because DB must be initialized before we can query records.
 func EnsureAdmin(app *pocketbase.PocketBase, adminEmail, adminPass string) {
 	if adminEmail == "" || adminPass == "" {
@@ -68,37 +69,31 @@ func EnsureAdmin(app *pocketbase.PocketBase, adminEmail, adminPass string) {
 	}
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		superusers, err := app.FindAllRecords("_superusers")
-		if err != nil {
-			log.Printf("Failed to find superusers: %v", err)
+		existing, _ := app.FindAuthRecordByEmail("_superusers", adminEmail)
+		if existing != nil {
+			existing.SetPassword(adminPass)
+			if err := app.Save(existing); err != nil {
+				log.Printf("Failed to update superuser password: %v", err)
+			} else {
+				log.Printf("Updated superuser: %s", adminEmail)
+			}
 			return e.Next()
 		}
 
-		hasRealAdmin := false
-		for _, su := range superusers {
-			email := su.GetString("email")
-			if email != "" && email != "__pbinstaller@example.com" {
-				hasRealAdmin = true
-				break
-			}
+		collection, err := app.FindCollectionByNameOrId("_superusers")
+		if err != nil {
+			log.Printf("Failed to find _superusers collection: %v", err)
+			return e.Next()
 		}
 
-		if !hasRealAdmin {
-			collection, err := app.FindCollectionByNameOrId("_superusers")
-			if err != nil {
-				log.Printf("Failed to find _superusers collection: %v", err)
-				return e.Next()
-			}
+		superuser := core.NewRecord(collection)
+		superuser.Set("email", adminEmail)
+		superuser.SetPassword(adminPass)
 
-			superuser := core.NewRecord(collection)
-			superuser.Set("email", adminEmail)
-			superuser.SetPassword(adminPass)
-
-			if err := app.Save(superuser); err != nil {
-				log.Printf("Failed to create default superuser: %v", err)
-			} else {
-				log.Printf("Created default superuser: %s", adminEmail)
-			}
+		if err := app.Save(superuser); err != nil {
+			log.Printf("Failed to create superuser: %v", err)
+		} else {
+			log.Printf("Created superuser: %s", adminEmail)
 		}
 
 		return e.Next()

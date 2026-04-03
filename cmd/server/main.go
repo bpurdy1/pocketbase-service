@@ -6,8 +6,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"pocketbase-server/internal/logging"
 	"pocketbase-server/server"
 )
+
+func init() {
+	logging.SetGlobal()
+}
 
 func main() {
 	srv, err := server.New()

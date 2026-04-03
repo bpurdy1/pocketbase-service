@@ -13,11 +13,14 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"pocketbase-server/internal/collections/auth"
+	"pocketbase-server/internal/collections/notifications"
 	"pocketbase-server/internal/collections/organizations"
 	"pocketbase-server/internal/collections/realestate"
 	"pocketbase-server/internal/collections/tenancy"
 	"pocketbase-server/internal/collections/users"
+	"pocketbase-server/internal/cronjobs"
 	"pocketbase-server/internal/database"
+	"pocketbase-server/internal/logging"
 	"pocketbase-server/server/admin"
 	"pocketbase-server/server/router"
 	"pocketbase-server/service"
@@ -91,6 +94,15 @@ func New() (*Server, error) {
 		conn: conn,
 	}
 
+	// Request logging middleware
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		e.Router.BindFunc(func(re *core.RequestEvent) error {
+			logging.Infof("%s %s", re.Request.Method, re.Request.URL.Path)
+			return re.Next()
+		})
+		return e.Next()
+	})
+
 	router := router.NewRouter(s.App())
 	router.RegisterBind()
 	admin.BindSyncFunc(s.App(), s)
@@ -98,20 +110,31 @@ func New() (*Server, error) {
 	admin.EnsureAdmin(s.App(), cfg.AdminEmail, cfg.AdminPass)
 
 	// Phase 1: Create collections (no cross-collection rules)
-	users.EnsureCollection(s.App())
-	users.EnsureSettings(s.App())
+	users.EnsureCollectionOnBeforeServe(s.App())
+	users.EnsureSettingsOnBeforeServe(s.App())
 	users.RegisterHooks(s.App())
-	organizations.EnsureCollection(s.App())
-	organizations.EnsureMembers(s.App())
+	organizations.EnsureCollectionOnBeforeServe(s.App())
+	organizations.EnsureMembersOnBeforeServe(s.App())
+	organizations.EnsureOrgSettingsOnBeforeServe(s.App())
+	organizations.EnsureInvitesOnBeforeServe(s.App())
 	organizations.RegisterHooks(s.App())
-	realestate.EnsureProperties(s.App())
+	organizations.RegisterInviteHooks(s.App())
+	notifications.EnsureCollectionOnBeforeServe(s.App())
+	notifications.RegisterHooks(s.App())
+	realestate.EnsurePropertiesOnBeforeServe(s.App())
 
 	// Phase 2: Apply access rules (all collections now exist)
 	organizations.ApplyRules(s.App())
+	organizations.ApplyInviteRules(s.App())
+	organizations.ApplyOrgSettingsRules(s.App())
 	tenancy.EnforceTenancy(s.App())
 	auth.EnsureOAuth2Providers(s.App())
 
+	// Cron jobs
+	cronjobs.RegisterExpireInvites(s.App())
+
 	service.NewService(s.App())
+
 	return s, nil
 }
 
