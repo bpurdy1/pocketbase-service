@@ -15,7 +15,6 @@ import (
 	"pocketbase-server/internal/cronjobs"
 	"pocketbase-server/internal/database"
 	"pocketbase-server/internal/logging"
-	"pocketbase-server/internal/realestate/spatial"
 	"pocketbase-server/pb/collections/auth"
 	"pocketbase-server/pb/collections/notifications"
 	"pocketbase-server/pb/collections/organizations"
@@ -159,12 +158,6 @@ func New() (*Server, error) {
 	realestate.EnsureSavedPropertiesOnBeforeServe(s.App())
 	realestate.EnsureSavedPropertyHistoryOnBeforeServe(s.App())
 	realestate.RegisterSavedPropertyHooks(s.App())
-
-	// R*Tree spatial index — must register after EnsurePropertiesOnBeforeServe
-	// so the "properties" table exists when the migration triggers are created.
-	if err := spatial.Wire(s.App(), conn.DB); err != nil {
-		return nil, fmt.Errorf("spatial wire: %w", err)
-	}
 
 	// Phase 2: Apply access rules (all collections now exist)
 	organizations.ApplyRules(s.App())
