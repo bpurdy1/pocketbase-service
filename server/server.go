@@ -12,15 +12,17 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 
-	"pocketbase-server/internal/collections/auth"
-	"pocketbase-server/internal/collections/notifications"
-	"pocketbase-server/internal/collections/organizations"
-	"pocketbase-server/internal/collections/realestate"
-	"pocketbase-server/internal/collections/tenancy"
-	"pocketbase-server/internal/collections/users"
 	"pocketbase-server/internal/cronjobs"
 	"pocketbase-server/internal/database"
 	"pocketbase-server/internal/logging"
+	"pocketbase-server/internal/realestate/spatial"
+	"pocketbase-server/pb/collections/auth"
+	"pocketbase-server/pb/collections/notifications"
+	"pocketbase-server/pb/collections/organizations"
+	"pocketbase-server/pb/collections/photos"
+	"pocketbase-server/pb/collections/realestate"
+	"pocketbase-server/pb/collections/tenancy"
+	"pocketbase-server/pb/collections/users"
 	"pocketbase-server/server/admin"
 	"pocketbase-server/server/router"
 	"pocketbase-server/service"
@@ -37,6 +39,14 @@ type Config struct {
 	LibSQLURL      string        `env:"LIBSQL_URL" envDefault:"http://localhost:8080"`
 	LibSQLToken    string        `env:"LIBSQL_AUTH_TOKEN" envDefault:""`
 	LibSQLInterval time.Duration `env:"LIBSQL_SYNC_INTERVAL" envDefault:"30s"`
+
+	// S3 file storage (optional — leave blank to use local disk)
+	S3Bucket         string `env:"S3_BUCKET" envDefault:""`
+	S3Region         string `env:"S3_REGION" envDefault:""`
+	S3Endpoint       string `env:"S3_ENDPOINT" envDefault:""`
+	S3AccessKey      string `env:"S3_ACCESS_KEY" envDefault:""`
+	S3Secret         string `env:"S3_SECRET" envDefault:""`
+	S3ForcePathStyle bool   `env:"S3_FORCE_PATH_STYLE" envDefault:"false"`
 }
 
 func (cfg *Config) httpFlag() string {
@@ -109,6 +119,24 @@ func New() (*Server, error) {
 	admin.RedirectAdminUI(s.App())
 	admin.EnsureAdmin(s.App(), cfg.AdminEmail, cfg.AdminPass)
 
+	// S3 file storage (only applied if S3_BUCKET is set)
+	if cfg.S3Bucket != "" {
+		app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+			settings := app.Settings()
+			settings.S3.Enabled = true
+			settings.S3.Bucket = cfg.S3Bucket
+			settings.S3.Region = cfg.S3Region
+			settings.S3.Endpoint = cfg.S3Endpoint
+			settings.S3.AccessKey = cfg.S3AccessKey
+			settings.S3.Secret = cfg.S3Secret
+			settings.S3.ForcePathStyle = cfg.S3ForcePathStyle
+			if err := app.Save(settings); err != nil {
+				return fmt.Errorf("failed to configure S3: %w", err)
+			}
+			return e.Next()
+		})
+	}
+
 	// Phase 1: Create collections (no cross-collection rules)
 	users.EnsureCollectionOnBeforeServe(s.App())
 	users.EnsureSettingsOnBeforeServe(s.App())
@@ -121,7 +149,22 @@ func New() (*Server, error) {
 	organizations.RegisterInviteHooks(s.App())
 	notifications.EnsureCollectionOnBeforeServe(s.App())
 	notifications.RegisterHooks(s.App())
+	photos.EnsureCollectionOnBeforeServe(s.App())
 	realestate.EnsurePropertiesOnBeforeServe(s.App())
+	realestate.EnsurePropertyDetailsOnBeforeServe(s.App())
+	realestate.EnsurePropertySaleHistoryOnBeforeServe(s.App())
+	realestate.EnsurePropertyTaxHistoryOnBeforeServe(s.App())
+	realestate.EnsurePropertyContactsOnBeforeServe(s.App())
+	realestate.EnsureRentalCompsOnBeforeServe(s.App())
+	realestate.EnsureSavedPropertiesOnBeforeServe(s.App())
+	realestate.EnsureSavedPropertyHistoryOnBeforeServe(s.App())
+	realestate.RegisterSavedPropertyHooks(s.App())
+
+	// R*Tree spatial index — must register after EnsurePropertiesOnBeforeServe
+	// so the "properties" table exists when the migration triggers are created.
+	if err := spatial.Wire(s.App(), conn.DB); err != nil {
+		return nil, fmt.Errorf("spatial wire: %w", err)
+	}
 
 	// Phase 2: Apply access rules (all collections now exist)
 	organizations.ApplyRules(s.App())

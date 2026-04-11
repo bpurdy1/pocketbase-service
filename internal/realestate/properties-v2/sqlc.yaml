@@ -1,0 +1,23 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema:
+      - "client/sql/schema/000_rtree_stubs.sql"
+      - "client/sql/schema/001_properties.sql"
+      - "client/sql/schema/002_listings.sql"
+      - "client/sql/schema/003_rentals.sql"
+      - "client/sql/schema/004_media.sql"
+      - "client/sql/schema/006_history_triggers.sql"
+    queries:
+      - "client/sql/queries/"
+      - "client/sql/raw/spatial.sql"
+    gen:
+      go:
+        package: "db"
+        out: "client/db"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true

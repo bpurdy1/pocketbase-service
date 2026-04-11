@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"pocketbase-server/internal/collections/organizations"
-	"pocketbase-server/internal/collections/users"
+	"pocketbase-server/pb/collections/organizations"
+	"pocketbase-server/pb/collections/users"
 )
 
 // bootstrapApp creates a real SQLite-backed PocketBase test app in a local
